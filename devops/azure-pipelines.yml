@@ -1,0 +1,30 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- name: serviceConnectionName
+  value: 'network360'
+- name: workspaceName
+  value: 'DEMO-POC'
+- name: pipelineName
+  value: 'PL_EndToEnd_DEV'
+
+jobs:
+- job: FabricAutomationJob
+  displayName: 'Automate Fabric Execution'
+  steps:
+  - task: AzureCLI@2
+    displayName: 'Deploy & Trigger Fabric Pipeline'
+    inputs:
+      azureSubscription: $(serviceConnectionName)
+      scriptType: 'pscore'
+      scriptLocation: 'scriptPath'
+      scriptPath: '$(Build.SourcesDirectory)/devops/fabric-rest.ps1'
+      arguments: '-workspaceName "$(workspaceName)" -pipelineName "$(pipelineName)" -sourceRoot "$(Build.SourcesDirectory)"'
+      addSpnToEnvironment: true
+      useGlobalConfig: true
+    env:
+      FABRIC_API_URL: 'https://api.fabric.microsoft.com/v1'

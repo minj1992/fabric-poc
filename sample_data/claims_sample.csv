@@ -1,0 +1,6 @@
+claim_id,member_id,provider_id,claim_type,amount,claim_date
+C001,M101,P201,Medical,500.00,2026-01-15
+C002,M102,P202,Pharmacy,75.50,2026-01-16
+C003,M101,P201,Medical,1200.00,2026-01-17
+C004,M103,P203,Dental,150.00,2026-01-18
+C005,M102,P202,Pharmacy,45.00,2026-01-19

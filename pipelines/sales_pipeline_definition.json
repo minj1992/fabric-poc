@@ -1,0 +1,83 @@
+{
+    "name": "sales_pipeline",
+    "properties": {
+        "activities": [
+            {
+                "name": "02_load_raw_to_silver",
+                "type": "Notebook",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebook": {
+                        "referenceName": "02_load_raw_to_silver",
+                        "type": "NotebookReference"
+                    },
+                    "snapshot": true
+                }
+            },
+            {
+                "name": "03_data_quality_checks",
+                "type": "Notebook",
+                "dependsOn": [
+                    {
+                        "activity": "02_load_raw_to_silver",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebook": {
+                        "referenceName": "03_data_quality_checks",
+                        "type": "NotebookReference"
+                    },
+                    "snapshot": true
+                }
+            },
+            {
+                "name": "04_audit_logging",
+                "type": "Notebook",
+                "dependsOn": [
+                    {
+                        "activity": "03_data_quality_checks",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebook": {
+                        "referenceName": "04_audit_logging",
+                        "type": "NotebookReference"
+                    },
+                    "snapshot": true
+                }
+            }
+        ],
+        "annotations": [],
+        "lastPublishTime": "2026-02-28T00:00:00Z"
+    }
+}
