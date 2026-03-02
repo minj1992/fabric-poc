@@ -1,0 +1,110 @@
+# AZDP_FABRIC_CAPACITY_SCHEDULER.yml
+# Purpose: Automatically Start (9AM IST) and Pause (7:00 PM IST) Fabric Capacity
+
+schedules:
+- cron: "30 3 * * *" # 9:00 AM IST (3:30 AM UTC)
+  displayName: "Daily_Start_9AM_IST"
+  branches:
+    include:
+    - master
+  always: true
+- cron: "30 13 * * *" # 7:00 PM IST (1:30 PM UTC)
+  displayName: "Daily_Stop_7PM_IST"
+  branches:
+    include:
+    - master
+  always: true
+
+parameters:
+- name: manualAction
+  displayName: Manual Action (Override)
+  type: string
+  default: 'Auto'
+  values:
+  - 'Auto'
+  - 'Resume'
+  - 'Suspend'
+- name: resourceGroupName
+  displayName: Resource Group Name
+  type: string
+  default: rg-fabric-dev
+- name: capacityName
+  displayName: Fabric Capacity Name
+  type: string
+  default: fabricf242e8dev
+
+trigger: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- name: serviceConnectionName
+  value: 'network360'
+
+jobs:
+- job: ScheduledControl
+  displayName: 'Scheduled Capacity Control'
+  steps:
+  - task: AzureCLI@2
+    displayName: 'Control Capacity'
+    env:
+      MANUAL_ACTION: ${{ parameters.manualAction }}
+      RG_NAME: ${{ parameters.resourceGroupName }}
+      CAPACITY_NAME: ${{ parameters.capacityName }}
+      SCHEDULE_NAME: $(Build.CronSchedule.DisplayName)
+    inputs:
+      azureSubscription: '$(serviceConnectionName)'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        ACTION=""
+
+        # 1. Determine Action based on Manual parameter or Schedule Display Name
+        if [ "$MANUAL_ACTION" != "Auto" ]; then
+            ACTION=$MANUAL_ACTION
+            echo "Manual override detected: $ACTION"
+        elif [ "$SCHEDULE_NAME" == "Daily_Start_9AM_IST" ]; then
+            ACTION="Resume"
+            echo "Schedule detected: Start Up (9AM IST)"
+        elif [ "$SCHEDULE_NAME" == "Daily_Stop_7PM_IST" ]; then
+            ACTION="Suspend"
+            echo "Schedule detected: Shut Down (7:00 PM IST)"
+        else
+            # Fallback to time-based detection
+            HOUR_UTC=$(date -u +%H)
+            MIN_UTC=$(date -u +%M)
+            if [ "$HOUR_UTC" -eq 3 ]; then 
+                ACTION="Resume"
+            elif [ "$HOUR_UTC" -eq 13 ]; then 
+                ACTION="Suspend"
+            fi
+            echo "Auto-detecting action based on UTC time ($HOUR_UTC:$MIN_UTC): $ACTION"
+        fi
+
+        if [ -z "$ACTION" ]; then
+            echo "No action determined. Exiting."
+            exit 0
+        fi
+
+        # 2. Check current state
+        echo "Checking state for $CAPACITY_NAME in $RG_NAME..."
+        STATE=$(az resource show --name "$CAPACITY_NAME" --resource-group "$RG_NAME" --resource-type Microsoft.Fabric/capacities --query properties.state -o tsv)
+        echo "Current Capacity State: $STATE"
+
+        # 3. Execute Action with Skip Logic
+        if [ "$ACTION" == "Resume" ]; then
+            if [ "$STATE" == "Active" ]; then
+                echo "Capacity is already Active. Skipping resume."
+            else
+                echo "Resuming Fabric Capacity: $CAPACITY_NAME..."
+                az resource invoke-action --name "$CAPACITY_NAME" --resource-group "$RG_NAME" --resource-type Microsoft.Fabric/capacities --action resume
+            fi
+        elif [ "$ACTION" == "Suspend" ]; then
+            if [ "$STATE" == "Paused" ] || [ "$STATE" == "Suspended" ]; then
+                echo "Capacity is already Paused/Suspended. Skipping suspend."
+            else
+                echo "Suspending Fabric Capacity: $CAPACITY_NAME..."
+                az resource invoke-action --name "$CAPACITY_NAME" --resource-group "$RG_NAME" --resource-type Microsoft.Fabric/capacities --action suspend
+            fi
+        fi
